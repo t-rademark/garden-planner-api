@@ -1,7 +1,8 @@
 import { ForbiddenException, Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { CreateGardenDto } from './dto/create-garden.dto';
 import { UpdateGardenDto } from './dto/update-garden.dto';
-import { Region } from './region';
+import { Region } from '@prisma/client';
+import { PrismaService } from 'src/prisma/prisma.service';
 
 export type Garden = {
     id: number;
@@ -17,23 +18,23 @@ export class GardenService {
     private nextId = 1;
     private gardens: Garden[] = [];
 
+    constructor(private prisma: PrismaService) {}
+
     listForOwner(ownerId: string) {
-        return this.gardens.filter((g) => g.ownerId === ownerId);
+        return this.prisma.garden.findMany({
+            where: { ownerId },
+            orderBy: { id: 'asc' },
+        });
     }
 
-    createForOwner(ownerId: string, dto: CreateGardenDto): Garden {
-        const now = new Date();
-        const garden: Garden = {
-            id: this.nextId++,
-            ownerId,
-            name: dto.name.trim(),
-            region: dto.region,
-            createdAt: now,
-            updatedAt: now,
-        };
-
-        this.gardens.push(garden);
-        return garden;
+    createForOwner(ownerId: string, dto: CreateGardenDto) {
+        return this.prisma.garden.create({
+            data: {
+                ownerId,
+                name: dto.name.trim(),
+                region: dto.region,
+            },
+        });
     }
 
     getOwndedGardenOrThrow(ownerId: string, gardenId: number): Garden {

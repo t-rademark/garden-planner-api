@@ -1,5 +1,5 @@
 import { IsEnum, IsOptional, IsString, MinLength } from "class-validator";
-import { Region } from "../region";
+import { Region } from "@prisma/client";
 
 export class UpdateGardenDto {
     @IsOptional()
