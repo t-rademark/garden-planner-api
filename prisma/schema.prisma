@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Region {
+  PERTH
+  PEEL
+  SOUTHWEST_WA
+}
+
+enum TaskStatus {
+  OPEN
+  DONE
+}
+
+enum TaskRecurrence {
+  NONE
+  DAILY
+  WEEKLY
+}
+
+model Garden {
+  id        Int      @id @default(autoincrement())
+  ownerId   String
+  name      String
+  region    Region
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  beds      Bed[]
+
+  @@index([ownerId])
+}
+
+model Bed {
+  id            Int      @id @default(autoincrement())
+  gardenId      Int
+  name          String
+  positionIndex Int
+  notes         String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  garden Garden @relation(fields: [gardenId], references: [id], onDelete: Cascade)
+  tasks  Task[]
+
+  @@unique([gardenId, positionIndex])
+}
+
+model Task {
+  id          Int            @id @default(autoincrement())
+  bedId       Int
+  title       String
+  dueOn       String?
+  recurrence  TaskRecurrence @default(NONE)
+  status      TaskStatus     @default(OPEN)
+  completedAt DateTime?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  bed Bed @relation(fields: [bedId], references: [id], onDelete: Cascade)
+}
