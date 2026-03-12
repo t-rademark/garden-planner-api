@@ -1,33 +1,21 @@
 import { ForbiddenException, Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { CreateGardenDto } from './dto/create-garden.dto';
 import { UpdateGardenDto } from './dto/update-garden.dto';
-import { Region } from '@prisma/client';
 import { PrismaService } from 'src/prisma/prisma.service';
-
-export type Garden = {
-    id: number;
-    ownerId: string;
-    name: string;
-    region: Region;
-    createdAt: Date;
-    updatedAt: Date;
-};
 
 @Injectable()
 export class GardenService {
-    private nextId = 1;
-    private gardens: Garden[] = [];
 
     constructor(private prisma: PrismaService) {}
 
-    listForOwner(ownerId: string) {
+    async listForOwner(ownerId: string) {
         return this.prisma.garden.findMany({
             where: { ownerId },
-            orderBy: { id: 'asc' },
+            orderBy: { createdAt: 'asc' },
         });
     }
 
-    createForOwner(ownerId: string, dto: CreateGardenDto) {
+    async createForOwner(ownerId: string, dto: CreateGardenDto) {
         return this.prisma.garden.create({
             data: {
                 ownerId,
@@ -37,36 +25,47 @@ export class GardenService {
         });
     }
 
-    getOwndedGardenOrThrow(ownerId: string, gardenId: number): Garden {
-        const garden = this.gardens.find((g) => g.id === gardenId);
+    async getOne(ownerId: string, gardenId: number) {
+        return this.findOwnedGardenOrThrow(ownerId, gardenId);
+    }
+
+    async update(ownerId: string, gardenId: number, dto: UpdateGardenDto) {
+        await this.findOwnedGardenOrThrow(ownerId, gardenId);
+
+        return this.prisma.garden.update({
+            where: { id: gardenId },
+            data: {
+                ...(dto.name !== undefined ? { name: dto.name.trim() } : {}),
+                ...(dto.region !== undefined ? { region: dto.region } : {}),
+            },
+        });
+    }
+
+    async remove(ownerId: string, gardenId: number) {
+        await this.findOwnedGardenOrThrow(ownerId, gardenId);
         
-        if (!garden) throw new NotFoundException(`Garden not found`);
-        if (garden.ownerId !== ownerId) throw new ForbiddenException(`You do not have access to this garden`);
-        return garden;
-    }
-
-    getOne(ownerId: string, gardenId: number): Garden {
-        return this.getOwndedGardenOrThrow(ownerId, gardenId);
-    }
-
-    update(ownerId: string, gardenId: number, dto: UpdateGardenDto): Garden {
-        const garden = this.getOwndedGardenOrThrow(ownerId, gardenId);
-
-        if (dto.name !== undefined) {
-            garden.name = dto.name.trim();
-        }
-        if (dto.region !== undefined) {
-            garden.region = dto.region;
-        }
-        garden.updatedAt = new Date();
-
-        return garden;
-    }
-
-    remove(ownerId: string, gardenId: number): { deleted: true} {
-        const garden = this.getOwndedGardenOrThrow(ownerId, gardenId);
-        
-        this.gardens = this.gardens.filter((g) => g.id !== garden.id);
-        return { deleted: true };
+        return this.prisma.garden.delete({
+            where: { id: gardenId },
+        });
     }   
+
+    async findOwnedGardenOrThrow(ownerId: string, gardenId: number) {
+        const garden = await this.prisma.garden.findFirst({
+            where: { 
+                id: gardenId,
+                ownerId,
+            },
+            include: { 
+                beds: {
+                    orderBy: { positionIndex: 'asc' },
+                },
+            },
+        });
+        
+        if (!garden) {
+            throw new NotFoundException(`Garden ${gardenId} not found`);
+        }
+        
+        return garden;
+    }
 }

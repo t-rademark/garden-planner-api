@@ -63,7 +63,7 @@ export class TaskController {
   ) {
   
     // Ensure the garden exists + is owned by this user
-    this.gardenService.getOwndedGardenOrThrow(userId, gardenId);
+    this.gardenService.findOwnedGardenOrThrow(userId, gardenId);
 
     const dueOn = todayPerth();
     const includeAnytime = includeUndated === 'true' || includeUndated === '1';

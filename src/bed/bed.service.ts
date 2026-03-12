@@ -12,7 +12,7 @@ export class BedService {
     constructor(private readonly gardenService: GardenService) {}
 
     listForGarden(ownerId: string, gardenId: number): Bed[] {
-        this.gardenService.getOwndedGardenOrThrow(ownerId, gardenId);
+        this.gardenService.findOwnedGardenOrThrow(ownerId, gardenId);
 
         return this.beds
             .filter((b) => b.gardenId === gardenId)
@@ -20,7 +20,7 @@ export class BedService {
     }
 
     createForGarden(ownerId: string, gardenId: number, dto: CreateBedDto): Bed {
-        this.gardenService.getOwndedGardenOrThrow(ownerId, gardenId);
+        this.gardenService.findOwnedGardenOrThrow(ownerId, gardenId);
 
         const name = dto.name.trim();
         const notes = dto.notes?.trim();
@@ -53,7 +53,7 @@ export class BedService {
         if (!bed) throw new NotFoundException(`Bed not found`);
 
         // Ownership checkvia parent garden
-        this.gardenService.getOwndedGardenOrThrow(ownerId, bed.gardenId);
+        this.gardenService.findOwnedGardenOrThrow(ownerId, bed.gardenId);
         return bed;
     }
 
