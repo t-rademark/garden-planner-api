@@ -8,15 +8,3 @@ export enum TaskRecurrence {
   DAILY = 'DAILY',
   WEEKLY = 'WEEKLY',
 }
-
-export type Task = {
-  id: number;
-  bedId: number;
-  title: string;
-  dueOn?: string; // YYYY-MM-DD (date-only)
-  recurrence: TaskRecurrence;
-  status: TaskStatus;
-  completedAt?: Date;
-  createdAt: Date;
-  updatedAt: Date;
-};
