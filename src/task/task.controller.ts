@@ -55,6 +55,7 @@ export class TaskController {
     return this.taskService.listDueTodayForBed(userId, bedId);
   }
 
+  /*
   @Get('gardens/:gardenId/today-walk')
   todayWalk(
     @UserId() userId: string,
@@ -63,7 +64,7 @@ export class TaskController {
   ) {
   
     // Ensure the garden exists + is owned by this user
-    this.gardenService.getOwndedGardenOrThrow(userId, gardenId);
+    this.gardenService.findOwnedGardenOrThrow(userId, gardenId);
 
     const dueOn = todayPerth();
     const includeAnytime = includeUndated === 'true' || includeUndated === '1';
@@ -110,6 +111,7 @@ export class TaskController {
       beds: result,
     };
   }
+    */
   
   @Post('beds/:bedId/tasks')
   createForBed(
