@@ -55,6 +55,7 @@ export class TaskController {
     return this.taskService.listDueTodayForBed(userId, bedId);
   }
 
+  /*
   @Get('gardens/:gardenId/today-walk')
   todayWalk(
     @UserId() userId: string,
@@ -110,6 +111,7 @@ export class TaskController {
       beds: result,
     };
   }
+    */
   
   @Post('beds/:bedId/tasks')
   createForBed(

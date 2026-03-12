@@ -28,7 +28,7 @@ export class TaskService {
     opts?: { dueOn?: string; status?: TaskStatus },
   ): Task[] {
     // Ownership check via bed -> garden
-    this.bedService.getOwnedBedOrThrow(ownerId, bedId);
+    this.bedService.findOwnedBedOrThrow(ownerId, bedId);
 
     let result = this.tasks.filter((t) => t.bedId === bedId);
 
@@ -53,7 +53,7 @@ export class TaskService {
   }
 
   createForBed(ownerId: string, bedId: number, dto: CreateTaskDto): Task {
-    this.bedService.getOwnedBedOrThrow(ownerId, bedId);
+    this.bedService.findOwnedBedOrThrow(ownerId, bedId);
 
     const title = dto.title.trim();
     if (!title) throw new BadRequestException('title is required');
@@ -79,7 +79,7 @@ export class TaskService {
     if (!task) throw new NotFoundException('Task not found');
 
     // Ownership check via bed
-    this.bedService.getOwnedBedOrThrow(ownerId, task.bedId);
+    this.bedService.findOwnedBedOrThrow(ownerId, task.bedId);
     return task;
   }
 
