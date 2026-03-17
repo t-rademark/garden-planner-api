@@ -19,11 +19,6 @@ export class BedController {
         return this.bedService.listForGarden(userId, gardenId);
     }
 
-    @Get('gardens/:gardenId/walk')
-    walk(@UserId() userId: string, @Param('gardenId', ParseIntPipe) gardenId: number) {
-        return this.bedService.listForGarden(userId, gardenId);
-    }
-
     @Post('gardens/:gardenId/beds')
     createForGarden(
         @UserId() userId: string, 
