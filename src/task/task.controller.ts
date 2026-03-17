@@ -49,6 +49,14 @@ export class TaskController {
     return this.taskService.listForBed(userId, bedId, { dueOn, status });
   }
 
+  @Get('gardens/:gardenId/tasks/due-today')
+  dueTodayForGarden(
+    @UserId() userId: string,
+    @Param('gardenId', ParseIntPipe) gardenId: number,
+  ) {
+    return this.taskService.listDueTodayForGarden(userId, gardenId);
+  }
+
   @Post('beds/:bedId/tasks')
   createForBed(
     @UserId() userId: string,

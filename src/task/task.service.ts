@@ -5,17 +5,6 @@ import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskRecurrence, TaskStatus } from './task.types';
 import { PrismaService } from 'src/prisma/prisma.service';
 
-function todayPerth(): string {
-  // Produces YYYY-MM-DD in Australia/Perth
-  // en-CA gives ISO-ish date format (YYYY-MM-DD) reliably
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Australia/Perth',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
-}
-
 @Injectable()
 export class TaskService {
 
@@ -37,6 +26,47 @@ export class TaskService {
     });
   }
 
+  async listDueTodayForGarden(ownerId: string, gardenId: number) {
+    const now = new Date();
+
+    // Convert "now" to Perth time
+    const perthNow = new Date(now.toLocaleString('en-US', { timeZone: 'Australia/Perth' }));
+
+    const startOfDay = new Date(perthNow);
+    startOfDay.setHours(0, 0, 0, 0);
+
+    const endOfDay = new Date(perthNow);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    return this.prisma.task.findMany({
+      where: {
+        bed: {
+          garden: {
+            id: gardenId,
+            ownerId,
+          },
+        },
+        dueOn: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+      include: {
+        bed: true,
+      },
+      orderBy: [
+        {
+          bed: {
+            positionIndex: 'asc',
+          },
+        },
+        {
+          createdAt: 'asc',
+        },
+      ],
+    });
+  }
+
   async createForBed(ownerId: string, bedId: number, dto: CreateTaskDto) {
     this.bedService.findOwnedBedOrThrow(ownerId, bedId);
 
@@ -46,7 +76,7 @@ export class TaskService {
       data: {
         bedId,
         title: dto.title.trim(),
-        dueOn: dto.dueOn,
+        dueOn: dto.dueOn ? new Date(dto.dueOn) : undefined,
         recurrence: dto.recurrence ?? TaskRecurrence.NONE,
         status: TaskStatus.OPEN,
         createdAt: now,
@@ -62,7 +92,7 @@ export class TaskService {
       where: { id: taskId },
       data: {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
-        ...(dto.dueOn !== undefined ? { dueOn: dto.dueOn } : {}),
+        ...(dto.dueOn !== undefined ? { dueOn: dto.dueOn ? new Date(dto.dueOn) : null } : {}),
         ...(dto.recurrence !== undefined ? { recurrence: dto.recurrence } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         updatedAt: new Date(),

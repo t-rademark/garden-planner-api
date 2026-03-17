@@ -56,7 +56,7 @@ model Task {
   id          Int            @id @default(autoincrement())
   bedId       Int
   title       String
-  dueOn       String?
+  dueOn       DateTime?      @db.Date
   recurrence  TaskRecurrence @default(NONE)
   status      TaskStatus     @default(OPEN)
   completedAt DateTime?
