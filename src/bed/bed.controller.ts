@@ -4,7 +4,10 @@ import { UserId } from 'src/auth/user.decorator';
 import { CreateBedDto } from './dto/create-bed.dto';
 import { UpdateBedDto } from './dto/update-bed.dto';
 import { BedService } from './bed.service';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Beds')
+@ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'))
 @Controller()
 export class BedController {

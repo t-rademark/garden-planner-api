@@ -4,7 +4,10 @@ import { UserId } from '../auth/user.decorator';
 import { CreateGardenDto } from './dto/create-garden.dto';
 import { UpdateGardenDto } from './dto/update-garden.dto';
 import { GardenService } from './garden.service';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('Gardens')
+@ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'))
 @Controller('gardens')
 export class GardenController {
