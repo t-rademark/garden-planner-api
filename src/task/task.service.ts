@@ -37,11 +37,6 @@ export class TaskService {
     });
   }
 
-  async listDueTodayForBed(ownerId: string, bedId: number) {
-    const dueOn = todayPerth();
-    return await this.listForBed(ownerId, bedId, { dueOn, status: TaskStatus.OPEN });
-  }
-
   async createForBed(ownerId: string, bedId: number, dto: CreateTaskDto) {
     this.bedService.findOwnedBedOrThrow(ownerId, bedId);
 
