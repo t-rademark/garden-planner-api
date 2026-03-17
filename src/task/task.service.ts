@@ -4,6 +4,7 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskRecurrence, TaskStatus } from './task.types';
 import { PrismaService } from 'src/prisma/prisma.service';
+import {getPerthDayRange} from 'src/common/utils/date.utils';
 
 @Injectable()
 export class TaskService {
@@ -27,16 +28,8 @@ export class TaskService {
   }
 
   async listDueTodayForGarden(ownerId: string, gardenId: number) {
-    const now = new Date();
 
-    // Convert "now" to Perth time
-    const perthNow = new Date(now.toLocaleString('en-US', { timeZone: 'Australia/Perth' }));
-
-    const startOfDay = new Date(perthNow);
-    startOfDay.setHours(0, 0, 0, 0);
-
-    const endOfDay = new Date(perthNow);
-    endOfDay.setHours(23, 59, 59, 999);
+    const { startOfDay, endOfDay } = getPerthDayRange();
 
     return this.prisma.task.findMany({
       where: {
@@ -64,6 +57,37 @@ export class TaskService {
           createdAt: 'asc',
         },
       ],
+    });
+  }
+
+  async getGardenWalk(ownerId: string, gardenId: number) {
+
+    const { startOfDay, endOfDay } = getPerthDayRange();
+
+    return this.prisma.bed.findMany({
+      where: {
+        garden: {
+          id: gardenId,
+          ownerId,
+        },
+      },
+      orderBy: {
+        positionIndex: 'asc',
+      },
+      include: {
+        tasks: {
+          where: {
+            dueOn: {
+              gte: startOfDay,
+              lte: endOfDay,
+            },
+          },
+          orderBy: [
+            { dueOn: 'asc', },
+            { createdAt: 'asc', },
+          ],
+        },
+      },
     });
   }
 

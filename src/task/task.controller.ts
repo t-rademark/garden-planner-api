@@ -57,6 +57,14 @@ export class TaskController {
     return this.taskService.listDueTodayForGarden(userId, gardenId);
   }
 
+  @Get('gardens/:gardenId/walk')
+  getGardenWalk(
+    @UserId() userId: string,
+    @Param('gardenId', ParseIntPipe) gardenId: number,
+  ) {
+    return this.taskService.getGardenWalk(userId, gardenId);
+  }
+
   @Post('beds/:bedId/tasks')
   createForBed(
     @UserId() userId: string,
