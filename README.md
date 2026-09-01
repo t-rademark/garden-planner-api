@@ -1,215 +1,162 @@
+# Garden Task Planner API
 
----
+Garden Task Planner is a multi-user API that turns structured garden data into clear, daily work. Tasks belong to ordered garden beds, beds belong to a user-owned garden, and daily views present open work in walking order.
 
+The project is under active development. APIs and data structures may still evolve.
 
-> 🚧 This project is under active development. APIs and structure may evolve.
+## Current capabilities
 
----
+- Auth0 JWT authentication with database-level ownership enforcement
+- Garden, bed, and task creation, listing, updates, and deletion
+- Bed ordering within a garden
+- Task filtering by due date and completion status
+- Perth-aware date-only scheduling
+- Task completion and reopening, including completion timestamps
+- Due-today and garden-walk views containing open tasks only
+- Request validation and normalization
+- Swagger/OpenAPI documentation
+- Unit, controller, and HTTP e2e tests
+- GitHub Actions quality gates for production dependency audit, lint, build, and tests
 
-# 🌱 Garden Task Planner API
+## Domain model
 
-A multi-user garden task planner that turns structured garden data into **clear, daily actionable work**.
-
-Instead of managing static to-do lists, this system models how gardening actually works:
-
-* Tasks belong to **beds**
-* Beds belong to a **garden**
-* Work is done **sequentially, in space, over time**
-
----
-
-# 🚀 Core Idea
-
-> “What should I do today, and where do I start?”
-
-This API answers that by:
-
-* Tracking tasks against garden beds
-* Identifying what’s due today
-* Guiding users through their garden in a logical walk order
-
----
-
-# 🧱 Domain Model
-
-```
-Garden
-  └── Beds (ordered)
-        └── Tasks (scheduled)
+```text
+Garden (owned by an Auth0 user)
+  └── Beds (ordered by position)
+        └── Tasks (scheduled and optionally recurring)
 ```
 
-### Key Concepts
+Task recurrence values (`NONE`, `DAILY`, and `WEEKLY`) are currently stored as task metadata. Automatically scheduling the next occurrence is planned work.
 
-* **Garden**: A user-owned space (e.g. property, backyard)
-* **Bed**: A physical area within a garden (ordered by position)
-* **Task**: A unit of work with a due date
+## Technology
 
----
+- Node.js 22
+- NestJS 11
+- Prisma 6
+- PostgreSQL
+- Auth0
+- Jest and Supertest
 
-# 🛠️ Tech Stack
+## Running locally
 
-* **Framework**: NestJS
-* **ORM**: Prisma
-* **Database**: PostgreSQL
-* **Auth**: Auth0 (planned / in progress)
+### Prerequisites
 
----
+- Node.js 22
+- PostgreSQL
+- An Auth0 API application
 
-# 📡 Key Endpoints
-
-## Gardens
-
-```
-POST   /gardens
-GET    /gardens
-```
-
-## Beds
-
-```
-POST   /beds
-GET    /gardens/:gardenId/beds
-```
-
-## Tasks
-
-```
-POST   /tasks
-GET    /beds/:bedId/tasks
-```
-
-## 🌟 Product Endpoints
-
-### 📅 Due Today
-
-```
-GET /gardens/:gardenId/tasks/due-today
-```
-
-Returns all tasks due today, ordered by:
-
-1. Bed position
-2. Due time
-
----
-
-### 🚶 Walk the Garden
-
-```
-GET /gardens/:gardenId/walk
-```
-
-Returns tasks grouped by bed, in walking order.
-
-This enables a natural workflow:
-
-* Start at Bed 1
-* Complete tasks
-* Move to next bed
-
----
-
-# 🔄 Example Workflow
-
-```
-1. Create a garden
-2. Add beds (in physical order)
-3. Add tasks to beds
-4. Query tasks due today
-5. Walk the garden and complete tasks
-```
-
----
-
-# 🔐 Ownership Model
-
-All queries enforce ownership at the database level:
-
-* Gardens belong to a user
-* Beds belong to a garden
-* Tasks belong to a bed
-
-This ensures:
-
-* No cross-user data access
-* Clean, single-query enforcement via Prisma
-
----
-
-# 🧠 Design Philosophy
-
-This project intentionally avoids over-engineering.
-
-Focus areas:
-
-* Simple, composable data model
-* Real-world alignment (gardens are spatial)
-* Incremental feature layering
-* Backend-first product thinking
-
----
-
-# 🗺️ Roadmap
-
-### Near Term
-
-* Swagger / OpenAPI integration
-* DTO validation improvements
-* Optional query filters (e.g. per bed)
-
-### Mid Term
-
-* Recurring task engine (watering, fertilising, etc.)
-* Task completion tracking
-* Basic frontend / mobile client
-
-### Long Term
-
-* Multi-user gardens
-* Shared templates
-* Subscription-based SaaS model
-
----
-
-# ⚙️ Running Locally
+### Setup
 
 ```bash
-# Install deps
-npm install
-
-# Run database
+npm ci
+cp .env.example .env
 npx prisma migrate dev
-
-# Start server
 npm run start:dev
 ```
 
----
+On Windows Command Prompt, use `copy .env.example .env`. In PowerShell, use `Copy-Item .env.example .env`.
 
-# 🧪 Example Use Case
+Configure `.env` with values for your local PostgreSQL database and Auth0 tenant. The Auth0 domain must not include a protocol; the issuer must include `https://` and normally ends with `/`.
 
-A user with:
+The API starts on `http://localhost:3000` by default. Interactive OpenAPI documentation is available at `http://localhost:3000/docs`.
 
-* 5 garden beds
-* 20+ recurring tasks
+Do not commit `.env`; it is intentionally ignored by Git.
 
-Each morning:
+## API routes
 
-* Calls `/tasks/due-today`
-* Then `/walk`
-* Completes tasks in order
+All routes below require an Auth0 bearer token.
 
-No thinking. Just doing.
+### Profile
 
----
+```text
+GET    /profile
+```
 
-# 💡 Why This Project Exists
+### Gardens
 
-To explore:
+```text
+GET    /gardens
+POST   /gardens
+GET    /gardens/:gardenId
+PATCH  /gardens/:gardenId
+DELETE /gardens/:gardenId
+```
 
-* Real-world domain modelling
-* Clean backend architecture
-* Building toward a small, useful SaaS product
+### Beds
 
----
+```text
+GET    /gardens/:gardenId/beds
+POST   /gardens/:gardenId/beds
+PATCH  /beds/:bedId
+DELETE /beds/:bedId
+```
 
+### Tasks
+
+```text
+GET    /beds/:bedId/tasks
+POST   /beds/:bedId/tasks
+PATCH  /tasks/:taskId
+DELETE /tasks/:taskId
+```
+
+Task lists support optional `dueOn=YYYY-MM-DD` and `status=OPEN|DONE` query parameters.
+
+### Daily product views
+
+```text
+GET /gardens/:gardenId/tasks/due-today
+GET /gardens/:gardenId/walk
+```
+
+`due-today` returns today's open tasks with their beds, ordered by bed position and task creation time. `walk` returns the garden's beds in position order with today's open tasks nested under each bed.
+
+## Quality checks
+
+Run the same checks used by CI before opening a pull request:
+
+```bash
+npm run audit:prod
+npm run lint
+npm run build
+npm test
+npm run test:e2e
+```
+
+`npm run lint` is read-only and fails on warnings. Use `npm run lint:fix` when you intentionally want ESLint and Prettier to update files.
+
+GitHub Actions runs these checks for pull requests and pushes to `dev` and `main`. It can also be started manually from the Actions tab.
+
+## Branching workflow
+
+Work is completed in focused branches and merged through:
+
+```text
+feature/fix/test/docs/ci branch → dev → main
+```
+
+`dev` is the integration branch. `main` is the stable release checkpoint.
+
+## Roadmap
+
+### Next
+
+- Run integration tests against a real PostgreSQL service in CI
+- Implement transactional, idempotent daily and weekly task recurrence
+- Add startup configuration validation and health/readiness endpoints
+
+### Later
+
+- Build a basic web or mobile client
+- Support multi-user garden collaboration
+- Add reusable garden and task templates
+- Upgrade to Prisma 7 as a dedicated breaking-change migration
+- Explore subscription-based product features
+
+## Design principles
+
+- Enforce ownership in database queries
+- Keep date-only garden scheduling independent of server timezone
+- Prefer small, composable domain operations
+- Add features in focused, independently reviewable slices
+- Avoid infrastructure complexity until the product requires it
