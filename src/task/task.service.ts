@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { BedService } from '../bed/bed.service';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { ListTasksQueryDto } from './dto/list-tasks-query.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskRecurrence, TaskStatus } from './task.types';
 import { PrismaService } from 'src/prisma/prisma.service';
@@ -16,7 +17,7 @@ export class TaskService {
   async listForBed(
     ownerId: string,
     bedId: number,
-    opts?: { dueOn?: string; status?: TaskStatus },
+    filters: ListTasksQueryDto = {},
   ) {
     return this.prisma.task.findMany({
       where: {
@@ -26,6 +27,10 @@ export class TaskService {
             ownerId,
           },
         },
+        ...(filters.dueOn !== undefined
+          ? { dueOn: new Date(`${filters.dueOn}T00:00:00.000Z`) }
+          : {}),
+        ...(filters.status !== undefined ? { status: filters.status } : {}),
       },
     });
   }
