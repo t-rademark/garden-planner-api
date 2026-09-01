@@ -1,13 +1,18 @@
-import { IsEnum, IsOptional, IsString, MinLength } from "class-validator";
-import { Region } from "@prisma/client";
+import { IsEnum, IsString, MinLength } from 'class-validator';
+import { Region } from '@prisma/client';
+import {
+  Trim,
+  ValidateIfPresent,
+} from '../../common/validation/validation.decorators';
 
 export class UpdateGardenDto {
-    @IsOptional()
-    @IsString()
-    @MinLength(1)
-    name?: string;
+  @ValidateIfPresent()
+  @Trim()
+  @IsString()
+  @MinLength(1)
+  name?: string;
 
-    @IsOptional()
-    @IsEnum(Region)
-    region?: Region;
+  @ValidateIfPresent()
+  @IsEnum(Region)
+  region?: Region;
 }

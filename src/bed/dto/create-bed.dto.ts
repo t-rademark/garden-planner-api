@@ -1,16 +1,22 @@
-import { IsInt, IsOptional, IsString, Min, MinLength } from "class-validator";
+import { IsInt, IsString, Min, MinLength } from 'class-validator';
+import {
+  Trim,
+  ValidateIfPresent,
+} from '../../common/validation/validation.decorators';
 
 export class CreateBedDto {
-    @IsString()
-    @MinLength(1)
-    name!: string;
+  @Trim()
+  @IsString()
+  @MinLength(1)
+  name!: string;
 
-    @IsInt()
-    @Min(0)
-    positionIndex!: number;
+  @IsInt()
+  @Min(0)
+  positionIndex!: number;
 
-    @IsOptional()
-    @IsString()
-    @MinLength(1)
-    notes?: string;
+  @ValidateIfPresent()
+  @Trim()
+  @IsString()
+  @MinLength(1)
+  notes?: string;
 }
