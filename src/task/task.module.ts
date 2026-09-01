@@ -7,6 +7,6 @@ import { GardenModule } from '../garden/garden.module';
 @Module({
   imports: [BedModule, GardenModule],
   controllers: [TaskController],
-  providers: [TaskService]
+  providers: [TaskService],
 })
 export class TaskModule {}

@@ -9,20 +9,13 @@ import { Test, TestingModule } from '@nestjs/testing';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AppModule } from '../src/app.module';
+import { AuthenticatedRequest } from '../src/auth/auth.types';
 import { JwtStrategy } from '../src/auth/jwt.strategy';
 import { PrismaService } from '../src/prisma/prisma.service';
 
 jest.mock('jwks-rsa', () => ({
   passportJwtSecret: jest.fn(),
 }));
-
-interface AuthenticatedRequest {
-  user?: {
-    sub: string;
-    aud: string;
-    iss: string;
-  };
-}
 
 describe('Garden Planner API (e2e)', () => {
   let app: INestApplication<App>;
