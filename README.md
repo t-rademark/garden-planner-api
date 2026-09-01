@@ -12,6 +12,7 @@ The project is under active development. APIs and data structures may still evol
 - Task filtering by due date and completion status
 - Perth-aware date-only scheduling
 - Task completion and reopening, including completion timestamps
+- Transactional daily and weekly task recurrence
 - Due-today and garden-walk views containing open tasks only
 - Request validation and normalization
 - Swagger/OpenAPI documentation
@@ -26,7 +27,7 @@ Garden (owned by an Auth0 user)
         └── Tasks (scheduled and optionally recurring)
 ```
 
-Task recurrence values (`NONE`, `DAILY`, and `WEEKLY`) are currently stored as task metadata. Automatically scheduling the next occurrence is planned work.
+Recurring tasks require a due date. Completing a `DAILY` or `WEEKLY` task creates exactly one next open occurrence, scheduled one or seven days after the completed occurrence's due date. Repeated or concurrent completion requests do not create duplicates.
 
 ## Technology
 
@@ -144,9 +145,8 @@ feature/fix/test/docs/ci branch → dev → main
 
 ### Next
 
-- Run integration tests against a real PostgreSQL service in CI
-- Implement transactional, idempotent daily and weekly task recurrence
 - Add startup configuration validation and health/readiness endpoints
+- Document and exercise a production deployment workflow
 
 ### Later
 

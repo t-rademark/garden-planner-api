@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { BedService } from '../bed/bed.service';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { ListTasksQueryDto } from './dto/list-tasks-query.dto';
@@ -94,13 +98,17 @@ export class TaskService {
     await this.bedService.findOwnedBedOrThrow(ownerId, bedId);
 
     const now = new Date();
+    const dueOn = dto.dueOn ? dateOnlyToUtc(dto.dueOn) : null;
+    const recurrence = dto.recurrence ?? TaskRecurrence.NONE;
 
-    return await this.prisma.task.create({
+    this.assertRecurrenceHasDueDate(recurrence, dueOn);
+
+    return this.prisma.task.create({
       data: {
         bedId,
         title: dto.title.trim(),
-        dueOn: dto.dueOn ? dateOnlyToUtc(dto.dueOn) : undefined,
-        recurrence: dto.recurrence ?? TaskRecurrence.NONE,
+        dueOn,
+        recurrence,
         status: TaskStatus.OPEN,
         createdAt: now,
         updatedAt: now,
@@ -109,16 +117,40 @@ export class TaskService {
   }
 
   async update(ownerId: string, taskId: number, dto: UpdateTaskDto) {
-    const existingTask = await this.findOwnedTaskOrThrow(ownerId, taskId);
     const now = new Date();
 
-    return this.prisma.task.update({
-      where: { id: taskId },
-      data: {
+    return this.prisma.$transaction(async (transaction) => {
+      const existingTask = await transaction.task.findFirst({
+        where: {
+          id: taskId,
+          bed: {
+            garden: {
+              ownerId,
+            },
+          },
+        },
+      });
+
+      if (!existingTask) {
+        throw new NotFoundException(
+          `Task with id ${taskId} not found for this user`,
+        );
+      }
+
+      const effectiveDueOn =
+        dto.dueOn !== undefined
+          ? dto.dueOn
+            ? dateOnlyToUtc(dto.dueOn)
+            : null
+          : existingTask.dueOn;
+      const effectiveRecurrence =
+        dto.recurrence ?? (existingTask.recurrence as TaskRecurrence);
+
+      this.assertRecurrenceHasDueDate(effectiveRecurrence, effectiveDueOn);
+
+      const updateData = {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
-        ...(dto.dueOn !== undefined
-          ? { dueOn: dto.dueOn ? dateOnlyToUtc(dto.dueOn) : null }
-          : {}),
+        ...(dto.dueOn !== undefined ? { dueOn: effectiveDueOn } : {}),
         ...(dto.recurrence !== undefined ? { recurrence: dto.recurrence } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         ...(dto.status === TaskStatus.DONE
@@ -126,7 +158,59 @@ export class TaskService {
           : {}),
         ...(dto.status === TaskStatus.OPEN ? { completedAt: null } : {}),
         updatedAt: now,
-      },
+      };
+
+      const isNewCompletion =
+        dto.status === TaskStatus.DONE &&
+        (existingTask.status as TaskStatus) !== TaskStatus.DONE;
+
+      if (!isNewCompletion) {
+        return transaction.task.update({
+          where: { id: taskId },
+          data: updateData,
+        });
+      }
+
+      const completion = await transaction.task.updateMany({
+        where: {
+          id: taskId,
+          status: TaskStatus.OPEN,
+        },
+        data: updateData,
+      });
+
+      if (completion.count === 0) {
+        return transaction.task.findUniqueOrThrow({
+          where: { id: taskId },
+        });
+      }
+
+      if (
+        effectiveRecurrence !== TaskRecurrence.NONE &&
+        effectiveDueOn !== null
+      ) {
+        const recurrenceDays =
+          effectiveRecurrence === TaskRecurrence.DAILY ? 1 : 7;
+        const nextDueOn = new Date(effectiveDueOn);
+        nextDueOn.setUTCDate(nextDueOn.getUTCDate() + recurrenceDays);
+
+        await transaction.task.upsert({
+          where: { generatedFromTaskId: taskId },
+          update: {},
+          create: {
+            bedId: existingTask.bedId,
+            generatedFromTaskId: taskId,
+            title: dto.title?.trim() ?? existingTask.title,
+            dueOn: nextDueOn,
+            recurrence: effectiveRecurrence,
+            status: TaskStatus.OPEN,
+          },
+        });
+      }
+
+      return transaction.task.findUniqueOrThrow({
+        where: { id: taskId },
+      });
     });
   }
 
@@ -157,5 +241,14 @@ export class TaskService {
     }
 
     return task;
+  }
+
+  private assertRecurrenceHasDueDate(
+    recurrence: TaskRecurrence,
+    dueOn: Date | null,
+  ): void {
+    if (recurrence !== TaskRecurrence.NONE && dueOn === null) {
+      throw new BadRequestException('Recurring tasks require a due date');
+    }
   }
 }
