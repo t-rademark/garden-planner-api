@@ -39,6 +39,10 @@ describe('TaskService', () => {
     );
   });
 
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
   it('lists tasks using the owner-scoped bed query without filters', async () => {
     prisma.task.findMany.mockResolvedValue([]);
 
@@ -94,6 +98,42 @@ describe('TaskService', () => {
         bed: { garden: { ownerId: 'user-a' } },
         dueOn: new Date('2026-09-01T00:00:00.000Z'),
         status: TaskStatus.OPEN,
+      },
+    });
+  });
+
+  it('queries due-today tasks using the Perth calendar date', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-31T16:00:00.000Z'));
+    prisma.task.findMany.mockResolvedValue([]);
+
+    await service.listDueTodayForGarden('user-a', 3);
+
+    expect(prisma.task.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          bed: { garden: { id: 3, ownerId: 'user-a' } },
+          dueOn: new Date('2026-09-01T00:00:00.000Z'),
+        },
+      }),
+    );
+  });
+
+  it('queries the garden walk using the Perth calendar date', async () => {
+    jest.useFakeTimers().setSystemTime(new Date('2026-08-31T15:59:59.999Z'));
+    prisma.bed.findMany.mockResolvedValue([]);
+
+    await service.getGardenWalk('user-a', 3);
+
+    expect(prisma.bed.findMany).toHaveBeenCalledWith({
+      where: { garden: { id: 3, ownerId: 'user-a' } },
+      orderBy: { positionIndex: 'asc' },
+      include: {
+        tasks: {
+          where: {
+            dueOn: new Date('2026-08-31T00:00:00.000Z'),
+          },
+          orderBy: [{ dueOn: 'asc' }, { createdAt: 'asc' }],
+        },
       },
     });
   });
