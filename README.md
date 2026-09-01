@@ -163,3 +163,4 @@ feature/fix/test/docs/ci branch → dev → main
 - Prefer small, composable domain operations
 - Add features in focused, independently reviewable slices
 - Avoid infrastructure complexity until the product requires it
+
