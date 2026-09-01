@@ -1,22 +1,21 @@
-import { Test, TestingModule } from '@nestjs/testing';
 import { AppController } from './app.controller';
-import { AppService } from './app.service';
 
 describe('AppController', () => {
-  let appController: AppController;
+  const controller = new AppController();
 
-  beforeEach(async () => {
-    const app: TestingModule = await Test.createTestingModule({
-      controllers: [AppController],
-      providers: [AppService],
-    }).compile();
-
-    appController = app.get<AppController>(AppController);
-  });
-
-  describe('root', () => {
-    it('should return "Hello World!"', () => {
-      expect(appController.getHello()).toBe('Hello World!');
+  it('returns the authenticated profile claims', () => {
+    expect(
+      controller.profile({
+        user: {
+          sub: 'auth0|user-a',
+          aud: 'garden-planner-api',
+          iss: 'https://example.auth0.com/',
+        },
+      }),
+    ).toEqual({
+      sub: 'auth0|user-a',
+      aud: 'garden-planner-api',
+      iss: 'https://example.auth0.com/',
     });
   });
 });

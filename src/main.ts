@@ -5,7 +5,7 @@ import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, // strips unknown fields
@@ -26,4 +26,7 @@ async function bootstrap() {
 
   await app.listen(process.env.PORT ? Number(process.env.PORT) : 3000);
 }
-bootstrap();
+bootstrap().catch((error: unknown) => {
+  console.error('Failed to start Garden Planner API', error);
+  process.exitCode = 1;
+});

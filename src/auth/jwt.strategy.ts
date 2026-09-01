@@ -3,6 +3,7 @@ import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import { ConfigService } from '@nestjs/config';
 import * as jwksRsa from 'jwks-rsa';
+import { AuthenticatedUser } from './auth.types';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -33,7 +34,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   // Whatever you return becomes req.user
-  validate(payload: any) {
+  validate(payload: AuthenticatedUser): AuthenticatedUser {
     return payload;
   }
 }

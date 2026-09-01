@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { BedService } from '../bed/bed.service';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { ListTasksQueryDto } from './dto/list-tasks-query.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskRecurrence, TaskStatus } from './task.types';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { getPerthDayRange } from 'src/common/utils/date.utils';
+import { dateOnlyToUtc, getPerthTodayDate } from 'src/common/utils/date.utils';
 
 @Injectable()
 export class TaskService {
@@ -16,7 +17,7 @@ export class TaskService {
   async listForBed(
     ownerId: string,
     bedId: number,
-    opts?: { dueOn?: string; status?: TaskStatus },
+    filters: ListTasksQueryDto = {},
   ) {
     return this.prisma.task.findMany({
       where: {
@@ -26,12 +27,16 @@ export class TaskService {
             ownerId,
           },
         },
+        ...(filters.dueOn !== undefined
+          ? { dueOn: dateOnlyToUtc(filters.dueOn) }
+          : {}),
+        ...(filters.status !== undefined ? { status: filters.status } : {}),
       },
     });
   }
 
   async listDueTodayForGarden(ownerId: string, gardenId: number) {
-    const { startOfDay, endOfDay } = getPerthDayRange();
+    const today = getPerthTodayDate();
 
     return this.prisma.task.findMany({
       where: {
@@ -41,10 +46,8 @@ export class TaskService {
             ownerId,
           },
         },
-        dueOn: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
+        dueOn: today,
+        status: TaskStatus.OPEN,
       },
       include: {
         bed: true,
@@ -63,7 +66,7 @@ export class TaskService {
   }
 
   async getGardenWalk(ownerId: string, gardenId: number) {
-    const { startOfDay, endOfDay } = getPerthDayRange();
+    const today = getPerthTodayDate();
 
     return this.prisma.bed.findMany({
       where: {
@@ -78,10 +81,8 @@ export class TaskService {
       include: {
         tasks: {
           where: {
-            dueOn: {
-              gte: startOfDay,
-              lte: endOfDay,
-            },
+            dueOn: today,
+            status: TaskStatus.OPEN,
           },
           orderBy: [{ dueOn: 'asc' }, { createdAt: 'asc' }],
         },
@@ -98,7 +99,7 @@ export class TaskService {
       data: {
         bedId,
         title: dto.title.trim(),
-        dueOn: dto.dueOn ? new Date(dto.dueOn) : undefined,
+        dueOn: dto.dueOn ? dateOnlyToUtc(dto.dueOn) : undefined,
         recurrence: dto.recurrence ?? TaskRecurrence.NONE,
         status: TaskStatus.OPEN,
         createdAt: now,
@@ -108,18 +109,23 @@ export class TaskService {
   }
 
   async update(ownerId: string, taskId: number, dto: UpdateTaskDto) {
-    await this.findOwnedTaskOrThrow(ownerId, taskId);
+    const existingTask = await this.findOwnedTaskOrThrow(ownerId, taskId);
+    const now = new Date();
 
     return this.prisma.task.update({
       where: { id: taskId },
       data: {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
         ...(dto.dueOn !== undefined
-          ? { dueOn: dto.dueOn ? new Date(dto.dueOn) : null }
+          ? { dueOn: dto.dueOn ? dateOnlyToUtc(dto.dueOn) : null }
           : {}),
         ...(dto.recurrence !== undefined ? { recurrence: dto.recurrence } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
-        updatedAt: new Date(),
+        ...(dto.status === TaskStatus.DONE
+          ? { completedAt: existingTask.completedAt ?? now }
+          : {}),
+        ...(dto.status === TaskStatus.OPEN ? { completedAt: null } : {}),
+        updatedAt: now,
       },
     });
   }

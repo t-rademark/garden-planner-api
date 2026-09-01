@@ -13,9 +13,9 @@ import {
 import { AuthGuard } from '@nestjs/passport';
 import { UserId } from '../auth/user.decorator';
 import { CreateTaskDto } from './dto/create-task.dto';
+import { ListTasksQueryDto } from './dto/list-tasks-query.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskService } from './task.service';
-import { TaskStatus } from './task.types';
 import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
 @ApiTags('Tasks')
@@ -23,9 +23,7 @@ import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 @UseGuards(AuthGuard('jwt'))
 @Controller()
 export class TaskController {
-  constructor(
-    private readonly taskService: TaskService,
-) {}
+  constructor(private readonly taskService: TaskService) {}
 
   // List tasks for a bed, with optional filters:
   // /beds/:bedId/tasks?dueOn=YYYY-MM-DD&status=OPEN|DONE
@@ -33,10 +31,9 @@ export class TaskController {
   listForBed(
     @UserId() userId: string,
     @Param('bedId', ParseIntPipe) bedId: number,
-    @Query('dueOn') dueOn?: string,
-    @Query('status') status?: TaskStatus,
+    @Query() query: ListTasksQueryDto,
   ) {
-    return this.taskService.listForBed(userId, bedId, { dueOn, status });
+    return this.taskService.listForBed(userId, bedId, query);
   }
 
   @Get('gardens/:gardenId/tasks/due-today')
@@ -74,7 +71,10 @@ export class TaskController {
   }
 
   @Delete('tasks/:taskId')
-  remove(@UserId() userId: string, @Param('taskId', ParseIntPipe) taskId: number) {
+  remove(
+    @UserId() userId: string,
+    @Param('taskId', ParseIntPipe) taskId: number,
+  ) {
     return this.taskService.remove(userId, taskId);
   }
 }
