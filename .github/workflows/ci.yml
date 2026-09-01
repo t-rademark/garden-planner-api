@@ -19,8 +19,23 @@ jobs:
     name: Build and test
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: garden_planner_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     env:
-      DATABASE_URL: postgresql://ci:ci@localhost:5432/garden_planner
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/garden_planner_test?schema=public
+      TEST_DATABASE_URL: postgresql://ci:ci@localhost:5432/garden_planner_test?schema=public
 
     steps:
       - name: Check out repository
@@ -34,6 +49,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Apply database migrations
+        run: npx prisma migrate deploy
 
       - name: Audit production dependencies
         run: npm run audit:prod
@@ -49,3 +67,6 @@ jobs:
 
       - name: Run end-to-end tests
         run: npm run test:e2e
+
+      - name: Run database integration tests
+        run: npm run test:integration

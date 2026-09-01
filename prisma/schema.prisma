@@ -32,7 +32,7 @@ model Garden {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  beds      Bed[]
+  beds Bed[]
 
   @@index([ownerId])
 }
@@ -53,15 +53,18 @@ model Bed {
 }
 
 model Task {
-  id          Int            @id @default(autoincrement())
-  bedId       Int
-  title       String
-  dueOn       DateTime?      @db.Date
-  recurrence  TaskRecurrence @default(NONE)
-  status      TaskStatus     @default(OPEN)
-  completedAt DateTime?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+  id                  Int            @id @default(autoincrement())
+  bedId               Int
+  generatedFromTaskId Int?           @unique
+  title               String
+  dueOn               DateTime?      @db.Date
+  recurrence          TaskRecurrence @default(NONE)
+  status              TaskStatus     @default(OPEN)
+  completedAt         DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
 
-  bed Bed @relation(fields: [bedId], references: [id], onDelete: Cascade)
+  bed            Bed   @relation(fields: [bedId], references: [id], onDelete: Cascade)
+  generatedFrom  Task? @relation("TaskRecurrenceChain", fields: [generatedFromTaskId], references: [id], onDelete: SetNull)
+  nextOccurrence Task? @relation("TaskRecurrenceChain")
 }
