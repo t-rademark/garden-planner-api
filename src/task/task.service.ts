@@ -47,6 +47,7 @@ export class TaskService {
           },
         },
         dueOn: today,
+        status: TaskStatus.OPEN,
       },
       include: {
         bed: true,
@@ -81,6 +82,7 @@ export class TaskService {
         tasks: {
           where: {
             dueOn: today,
+            status: TaskStatus.OPEN,
           },
           orderBy: [{ dueOn: 'asc' }, { createdAt: 'asc' }],
         },
@@ -107,7 +109,8 @@ export class TaskService {
   }
 
   async update(ownerId: string, taskId: number, dto: UpdateTaskDto) {
-    await this.findOwnedTaskOrThrow(ownerId, taskId);
+    const existingTask = await this.findOwnedTaskOrThrow(ownerId, taskId);
+    const now = new Date();
 
     return this.prisma.task.update({
       where: { id: taskId },
@@ -118,7 +121,11 @@ export class TaskService {
           : {}),
         ...(dto.recurrence !== undefined ? { recurrence: dto.recurrence } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
-        updatedAt: new Date(),
+        ...(dto.status === TaskStatus.DONE
+          ? { completedAt: existingTask.completedAt ?? now }
+          : {}),
+        ...(dto.status === TaskStatus.OPEN ? { completedAt: null } : {}),
+        updatedAt: now,
       },
     });
   }
