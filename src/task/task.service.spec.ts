@@ -2,6 +2,7 @@ import { NotFoundException } from '@nestjs/common';
 import { BedService } from '../bed/bed.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TaskService } from './task.service';
+import { TaskStatus } from './task.types';
 
 describe('TaskService', () => {
   let service: TaskService;
@@ -36,6 +37,65 @@ describe('TaskService', () => {
       bedService as unknown as BedService,
       prisma as unknown as PrismaService,
     );
+  });
+
+  it('lists tasks using the owner-scoped bed query without filters', async () => {
+    prisma.task.findMany.mockResolvedValue([]);
+
+    await service.listForBed('user-a', 2);
+
+    expect(prisma.task.findMany).toHaveBeenCalledWith({
+      where: {
+        bedId: 2,
+        bed: { garden: { ownerId: 'user-a' } },
+      },
+    });
+  });
+
+  it('filters tasks by due date', async () => {
+    prisma.task.findMany.mockResolvedValue([]);
+
+    await service.listForBed('user-a', 2, { dueOn: '2026-09-01' });
+
+    expect(prisma.task.findMany).toHaveBeenCalledWith({
+      where: {
+        bedId: 2,
+        bed: { garden: { ownerId: 'user-a' } },
+        dueOn: new Date('2026-09-01T00:00:00.000Z'),
+      },
+    });
+  });
+
+  it('filters tasks by status', async () => {
+    prisma.task.findMany.mockResolvedValue([]);
+
+    await service.listForBed('user-a', 2, { status: TaskStatus.DONE });
+
+    expect(prisma.task.findMany).toHaveBeenCalledWith({
+      where: {
+        bedId: 2,
+        bed: { garden: { ownerId: 'user-a' } },
+        status: TaskStatus.DONE,
+      },
+    });
+  });
+
+  it('combines due date and status filters', async () => {
+    prisma.task.findMany.mockResolvedValue([]);
+
+    await service.listForBed('user-a', 2, {
+      dueOn: '2026-09-01',
+      status: TaskStatus.OPEN,
+    });
+
+    expect(prisma.task.findMany).toHaveBeenCalledWith({
+      where: {
+        bedId: 2,
+        bed: { garden: { ownerId: 'user-a' } },
+        dueOn: new Date('2026-09-01T00:00:00.000Z'),
+        status: TaskStatus.OPEN,
+      },
+    });
   });
 
   it('does not create a task when the bed ownership check fails', async () => {
