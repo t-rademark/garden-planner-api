@@ -1,13 +1,16 @@
-import { IsDateString, IsEnum, IsOptional, Matches } from 'class-validator';
+import { IsEnum } from 'class-validator';
+import {
+  IsDateOnly,
+  ValidateIfPresent,
+} from '../../common/validation/validation.decorators';
 import { TaskStatus } from '../task.types';
 
 export class ListTasksQueryDto {
-  @IsOptional()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'dueOn must be YYYY-MM-DD' })
-  @IsDateString({ strict: true }, { message: 'dueOn must be a valid date' })
+  @ValidateIfPresent()
+  @IsDateOnly()
   dueOn?: string;
 
-  @IsOptional()
+  @ValidateIfPresent()
   @IsEnum(TaskStatus)
   status?: TaskStatus;
 }

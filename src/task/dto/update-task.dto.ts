@@ -1,21 +1,28 @@
-import { IsEnum, IsOptional, IsString, Matches, MinLength } from 'class-validator';
+import { IsEnum, IsString, MinLength } from 'class-validator';
+import {
+  IsDateOnly,
+  Trim,
+  ValidateIfPresent,
+  ValidateIfPresentAndNotNull,
+} from '../../common/validation/validation.decorators';
 import { TaskRecurrence, TaskStatus } from '../task.types';
 
 export class UpdateTaskDto {
-  @IsOptional()
+  @ValidateIfPresent()
+  @Trim()
   @IsString()
   @MinLength(1)
   title?: string;
 
-  @IsOptional()
-  @Matches(/^\d{4}-\d{2}-\d{2}$/, { message: 'dueOn must be YYYY-MM-DD' })
-  dueOn?: string;
+  @ValidateIfPresentAndNotNull()
+  @IsDateOnly()
+  dueOn?: string | null;
 
-  @IsOptional()
+  @ValidateIfPresent()
   @IsEnum(TaskRecurrence)
   recurrence?: TaskRecurrence;
 
-  @IsOptional()
+  @ValidateIfPresent()
   @IsEnum(TaskStatus)
   status?: TaskStatus;
 }
