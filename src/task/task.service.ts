@@ -5,7 +5,7 @@ import { ListTasksQueryDto } from './dto/list-tasks-query.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskRecurrence, TaskStatus } from './task.types';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { getPerthDayRange } from 'src/common/utils/date.utils';
+import { dateOnlyToUtc, getPerthTodayDate } from 'src/common/utils/date.utils';
 
 @Injectable()
 export class TaskService {
@@ -28,7 +28,7 @@ export class TaskService {
           },
         },
         ...(filters.dueOn !== undefined
-          ? { dueOn: new Date(`${filters.dueOn}T00:00:00.000Z`) }
+          ? { dueOn: dateOnlyToUtc(filters.dueOn) }
           : {}),
         ...(filters.status !== undefined ? { status: filters.status } : {}),
       },
@@ -36,7 +36,7 @@ export class TaskService {
   }
 
   async listDueTodayForGarden(ownerId: string, gardenId: number) {
-    const { startOfDay, endOfDay } = getPerthDayRange();
+    const today = getPerthTodayDate();
 
     return this.prisma.task.findMany({
       where: {
@@ -46,10 +46,7 @@ export class TaskService {
             ownerId,
           },
         },
-        dueOn: {
-          gte: startOfDay,
-          lte: endOfDay,
-        },
+        dueOn: today,
       },
       include: {
         bed: true,
@@ -68,7 +65,7 @@ export class TaskService {
   }
 
   async getGardenWalk(ownerId: string, gardenId: number) {
-    const { startOfDay, endOfDay } = getPerthDayRange();
+    const today = getPerthTodayDate();
 
     return this.prisma.bed.findMany({
       where: {
@@ -83,10 +80,7 @@ export class TaskService {
       include: {
         tasks: {
           where: {
-            dueOn: {
-              gte: startOfDay,
-              lte: endOfDay,
-            },
+            dueOn: today,
           },
           orderBy: [{ dueOn: 'asc' }, { createdAt: 'asc' }],
         },
@@ -103,7 +97,7 @@ export class TaskService {
       data: {
         bedId,
         title: dto.title.trim(),
-        dueOn: dto.dueOn ? new Date(dto.dueOn) : undefined,
+        dueOn: dto.dueOn ? dateOnlyToUtc(dto.dueOn) : undefined,
         recurrence: dto.recurrence ?? TaskRecurrence.NONE,
         status: TaskStatus.OPEN,
         createdAt: now,
@@ -120,7 +114,7 @@ export class TaskService {
       data: {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
         ...(dto.dueOn !== undefined
-          ? { dueOn: dto.dueOn ? new Date(dto.dueOn) : null }
+          ? { dueOn: dto.dueOn ? dateOnlyToUtc(dto.dueOn) : null }
           : {}),
         ...(dto.recurrence !== undefined ? { recurrence: dto.recurrence } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
