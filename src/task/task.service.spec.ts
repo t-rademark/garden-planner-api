@@ -1,8 +1,8 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { BedService } from '../bed/bed.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { TaskService } from './task.service';
-import { TaskStatus } from './task.types';
+import { TaskRecurrence, TaskStatus } from './task.types';
 
 describe('TaskService', () => {
   let service: TaskService;
@@ -11,11 +11,15 @@ describe('TaskService', () => {
     task: {
       create: jest.Mock;
       update: jest.Mock;
+      updateMany: jest.Mock;
+      upsert: jest.Mock;
       delete: jest.Mock;
       findFirst: jest.Mock;
       findMany: jest.Mock;
+      findUniqueOrThrow: jest.Mock;
     };
     bed: { findMany: jest.Mock };
+    $transaction: jest.Mock;
   };
 
   beforeEach(() => {
@@ -26,12 +30,20 @@ describe('TaskService', () => {
       task: {
         create: jest.fn(),
         update: jest.fn(),
+        updateMany: jest.fn(),
+        upsert: jest.fn(),
         delete: jest.fn(),
         findFirst: jest.fn(),
         findMany: jest.fn(),
+        findUniqueOrThrow: jest.fn(),
       },
       bed: { findMany: jest.fn() },
+      $transaction: jest.fn(),
     };
+    prisma.$transaction.mockImplementation(
+      async (callback: (client: typeof prisma) => Promise<unknown>) =>
+        callback(prisma),
+    );
 
     service = new TaskService(
       bedService as unknown as BedService,
@@ -152,26 +164,131 @@ describe('TaskService', () => {
     expect(prisma.task.create).not.toHaveBeenCalled();
   });
 
+  it('rejects a recurring task without a due date', async () => {
+    await expect(
+      service.createForBed('user-a', 2, {
+        title: 'Water seedlings',
+        recurrence: TaskRecurrence.DAILY,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prisma.task.create).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      recurrence: TaskRecurrence.DAILY,
+      dueOn: new Date('2026-09-30T00:00:00.000Z'),
+      nextDueOn: new Date('2026-10-01T00:00:00.000Z'),
+    },
+    {
+      recurrence: TaskRecurrence.WEEKLY,
+      dueOn: new Date('2026-12-28T00:00:00.000Z'),
+      nextDueOn: new Date('2027-01-04T00:00:00.000Z'),
+    },
+  ])(
+    'creates the next $recurrence occurrence when completing a task',
+    async ({ recurrence, dueOn, nextDueOn }) => {
+      const completedAt = new Date('2026-09-01T02:30:00.000Z');
+      jest.useFakeTimers().setSystemTime(completedAt);
+      prisma.task.findFirst.mockResolvedValue({
+        id: 7,
+        bedId: 2,
+        title: 'Water seedlings',
+        dueOn,
+        recurrence,
+        status: TaskStatus.OPEN,
+        completedAt: null,
+      });
+      prisma.task.updateMany.mockResolvedValue({ count: 1 });
+      prisma.task.upsert.mockResolvedValue({});
+      prisma.task.findUniqueOrThrow.mockResolvedValue({});
+
+      await service.update('user-a', 7, { status: TaskStatus.DONE });
+
+      expect(prisma.task.upsert).toHaveBeenCalledWith({
+        where: { generatedFromTaskId: 7 },
+        update: {},
+        create: {
+          bedId: 2,
+          generatedFromTaskId: 7,
+          title: 'Water seedlings',
+          dueOn: nextDueOn,
+          recurrence,
+          status: TaskStatus.OPEN,
+        },
+      });
+    },
+  );
+
+  it('does not generate a duplicate after another completion wins the transition', async () => {
+    prisma.task.findFirst.mockResolvedValue({
+      id: 7,
+      bedId: 2,
+      title: 'Water seedlings',
+      dueOn: new Date('2026-09-01T00:00:00.000Z'),
+      recurrence: TaskRecurrence.DAILY,
+      status: TaskStatus.OPEN,
+      completedAt: null,
+    });
+    prisma.task.updateMany.mockResolvedValue({ count: 0 });
+    prisma.task.findUniqueOrThrow.mockResolvedValue({
+      id: 7,
+      status: TaskStatus.DONE,
+    });
+
+    await service.update('user-a', 7, { status: TaskStatus.DONE });
+
+    expect(prisma.task.upsert).not.toHaveBeenCalled();
+    expect(prisma.task.findUniqueOrThrow).toHaveBeenCalledWith({
+      where: { id: 7 },
+    });
+  });
+
+  it('does not allow a due date to be removed from a recurring task', async () => {
+    prisma.task.findFirst.mockResolvedValue({
+      id: 7,
+      bedId: 2,
+      title: 'Water seedlings',
+      dueOn: new Date('2026-09-01T00:00:00.000Z'),
+      recurrence: TaskRecurrence.WEEKLY,
+      status: TaskStatus.OPEN,
+      completedAt: null,
+    });
+
+    await expect(
+      service.update('user-a', 7, { dueOn: null }),
+    ).rejects.toBeInstanceOf(BadRequestException);
+
+    expect(prisma.task.update).not.toHaveBeenCalled();
+  });
+
   it('records the completion time when a task is completed', async () => {
     const completedAt = new Date('2026-09-01T02:30:00.000Z');
     jest.useFakeTimers().setSystemTime(completedAt);
     prisma.task.findFirst.mockResolvedValue({
       id: 7,
+      bedId: 2,
+      title: 'Water seedlings',
+      dueOn: null,
+      recurrence: TaskRecurrence.NONE,
       status: TaskStatus.OPEN,
       completedAt: null,
     });
-    prisma.task.update.mockResolvedValue({});
+    prisma.task.updateMany.mockResolvedValue({ count: 1 });
+    prisma.task.findUniqueOrThrow.mockResolvedValue({});
 
     await service.update('user-a', 7, { status: TaskStatus.DONE });
 
-    expect(prisma.task.update).toHaveBeenCalledWith({
-      where: { id: 7 },
+    expect(prisma.task.updateMany).toHaveBeenCalledWith({
+      where: { id: 7, status: TaskStatus.OPEN },
       data: {
         status: TaskStatus.DONE,
         completedAt,
         updatedAt: completedAt,
       },
     });
+    expect(prisma.task.upsert).not.toHaveBeenCalled();
   });
 
   it('preserves the original completion time when an already-done task is updated', async () => {
@@ -180,6 +297,10 @@ describe('TaskService', () => {
     jest.useFakeTimers().setSystemTime(updateTime);
     prisma.task.findFirst.mockResolvedValue({
       id: 7,
+      bedId: 2,
+      title: 'Water seedlings',
+      dueOn: new Date('2026-09-01T00:00:00.000Z'),
+      recurrence: TaskRecurrence.DAILY,
       status: TaskStatus.DONE,
       completedAt: originalCompletion,
     });
@@ -195,6 +316,7 @@ describe('TaskService', () => {
         updatedAt: updateTime,
       },
     });
+    expect(prisma.task.upsert).not.toHaveBeenCalled();
   });
 
   it('clears the completion time when a task is reopened', async () => {
@@ -202,6 +324,10 @@ describe('TaskService', () => {
     jest.useFakeTimers().setSystemTime(updateTime);
     prisma.task.findFirst.mockResolvedValue({
       id: 7,
+      bedId: 2,
+      title: 'Water seedlings',
+      dueOn: null,
+      recurrence: TaskRecurrence.NONE,
       status: TaskStatus.DONE,
       completedAt: new Date('2026-08-31T03:00:00.000Z'),
     });
@@ -224,6 +350,10 @@ describe('TaskService', () => {
     jest.useFakeTimers().setSystemTime(updateTime);
     prisma.task.findFirst.mockResolvedValue({
       id: 7,
+      bedId: 2,
+      title: 'Water seedlings',
+      dueOn: null,
+      recurrence: TaskRecurrence.NONE,
       status: TaskStatus.DONE,
       completedAt: new Date('2026-08-31T03:00:00.000Z'),
     });

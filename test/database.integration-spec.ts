@@ -33,6 +33,8 @@ interface CreatedTask {
   bedId: number;
   dueOn: string;
   recurrence: string;
+  status: string;
+  generatedFromTaskId: number | null;
 }
 
 describe('Garden Planner database integration', () => {
@@ -209,6 +211,67 @@ describe('Garden Planner database integration', () => {
     ).resolves.toBe(0);
     await expect(prisma.task.count({ where: { bedId: bed.id } })).resolves.toBe(
       0,
+    );
+  });
+
+  it('creates exactly one next occurrence under concurrent completion', async () => {
+    const garden = await prisma.garden.create({
+      data: { ownerId: userA, name: 'Back garden', region: 'PERTH' },
+    });
+    const bed = await prisma.bed.create({
+      data: { gardenId: garden.id, name: 'Vegetables', positionIndex: 0 },
+    });
+    const task = await prisma.task.create({
+      data: {
+        bedId: bed.id,
+        title: 'Water seedlings',
+        dueOn: new Date('2026-09-01T00:00:00.000Z'),
+        recurrence: 'WEEKLY',
+      },
+    });
+
+    await Promise.all([
+      request(app.getHttpServer())
+        .patch(`/tasks/${task.id}`)
+        .set('x-test-user-id', userA)
+        .send({ status: 'DONE' })
+        .expect(200),
+      request(app.getHttpServer())
+        .patch(`/tasks/${task.id}`)
+        .set('x-test-user-id', userA)
+        .send({ status: 'DONE' })
+        .expect(200),
+    ]);
+
+    const tasksAfterCompletion = await prisma.task.findMany({
+      where: { bedId: bed.id },
+      orderBy: { id: 'asc' },
+    });
+
+    expect(tasksAfterCompletion).toHaveLength(2);
+    expect(tasksAfterCompletion[0]).toMatchObject({
+      id: task.id,
+      status: 'DONE',
+    });
+    expect(tasksAfterCompletion[0]?.completedAt).not.toBeNull();
+    expect(tasksAfterCompletion[1]).toMatchObject({
+      bedId: bed.id,
+      generatedFromTaskId: task.id,
+      title: 'Water seedlings',
+      dueOn: new Date('2026-09-08T00:00:00.000Z'),
+      recurrence: 'WEEKLY',
+      status: 'OPEN',
+      completedAt: null,
+    });
+
+    await request(app.getHttpServer())
+      .patch(`/tasks/${task.id}`)
+      .set('x-test-user-id', userA)
+      .send({ status: 'DONE' })
+      .expect(200);
+
+    await expect(prisma.task.count({ where: { bedId: bed.id } })).resolves.toBe(
+      2,
     );
   });
 });
