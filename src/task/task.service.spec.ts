@@ -113,6 +113,7 @@ describe('TaskService', () => {
         where: {
           bed: { garden: { id: 3, ownerId: 'user-a' } },
           dueOn: new Date('2026-09-01T00:00:00.000Z'),
+          status: TaskStatus.OPEN,
         },
       }),
     );
@@ -131,6 +132,7 @@ describe('TaskService', () => {
         tasks: {
           where: {
             dueOn: new Date('2026-08-31T00:00:00.000Z'),
+            status: TaskStatus.OPEN,
           },
           orderBy: [{ dueOn: 'asc' }, { createdAt: 'asc' }],
         },
@@ -148,6 +150,94 @@ describe('TaskService', () => {
     ).rejects.toBeInstanceOf(NotFoundException);
 
     expect(prisma.task.create).not.toHaveBeenCalled();
+  });
+
+  it('records the completion time when a task is completed', async () => {
+    const completedAt = new Date('2026-09-01T02:30:00.000Z');
+    jest.useFakeTimers().setSystemTime(completedAt);
+    prisma.task.findFirst.mockResolvedValue({
+      id: 7,
+      status: TaskStatus.OPEN,
+      completedAt: null,
+    });
+    prisma.task.update.mockResolvedValue({});
+
+    await service.update('user-a', 7, { status: TaskStatus.DONE });
+
+    expect(prisma.task.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: {
+        status: TaskStatus.DONE,
+        completedAt,
+        updatedAt: completedAt,
+      },
+    });
+  });
+
+  it('preserves the original completion time when an already-done task is updated', async () => {
+    const originalCompletion = new Date('2026-08-31T03:00:00.000Z');
+    const updateTime = new Date('2026-09-01T02:30:00.000Z');
+    jest.useFakeTimers().setSystemTime(updateTime);
+    prisma.task.findFirst.mockResolvedValue({
+      id: 7,
+      status: TaskStatus.DONE,
+      completedAt: originalCompletion,
+    });
+    prisma.task.update.mockResolvedValue({});
+
+    await service.update('user-a', 7, { status: TaskStatus.DONE });
+
+    expect(prisma.task.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: {
+        status: TaskStatus.DONE,
+        completedAt: originalCompletion,
+        updatedAt: updateTime,
+      },
+    });
+  });
+
+  it('clears the completion time when a task is reopened', async () => {
+    const updateTime = new Date('2026-09-01T02:30:00.000Z');
+    jest.useFakeTimers().setSystemTime(updateTime);
+    prisma.task.findFirst.mockResolvedValue({
+      id: 7,
+      status: TaskStatus.DONE,
+      completedAt: new Date('2026-08-31T03:00:00.000Z'),
+    });
+    prisma.task.update.mockResolvedValue({});
+
+    await service.update('user-a', 7, { status: TaskStatus.OPEN });
+
+    expect(prisma.task.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: {
+        status: TaskStatus.OPEN,
+        completedAt: null,
+        updatedAt: updateTime,
+      },
+    });
+  });
+
+  it('leaves completion metadata unchanged for unrelated updates', async () => {
+    const updateTime = new Date('2026-09-01T02:30:00.000Z');
+    jest.useFakeTimers().setSystemTime(updateTime);
+    prisma.task.findFirst.mockResolvedValue({
+      id: 7,
+      status: TaskStatus.DONE,
+      completedAt: new Date('2026-08-31T03:00:00.000Z'),
+    });
+    prisma.task.update.mockResolvedValue({});
+
+    await service.update('user-a', 7, { title: 'Updated title' });
+
+    expect(prisma.task.update).toHaveBeenCalledWith({
+      where: { id: 7 },
+      data: {
+        title: 'Updated title',
+        updatedAt: updateTime,
+      },
+    });
   });
 
   it('does not update a task that is not owned by the user', async () => {
