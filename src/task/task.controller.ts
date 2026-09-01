@@ -15,26 +15,16 @@ import { UserId } from '../auth/user.decorator';
 import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskService } from './task.service';
-import { BedService } from '../bed/bed.service';
-import { GardenService } from '../garden/garden.service';
 import { TaskStatus } from './task.types';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
 
-function todayPerth(): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Australia/Perth',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
-}
-
+@ApiTags('Tasks')
+@ApiBearerAuth()
 @UseGuards(AuthGuard('jwt'))
 @Controller()
 export class TaskController {
   constructor(
     private readonly taskService: TaskService,
-    private readonly bedService: BedService,
-    private readonly gardenService: GardenService
 ) {}
 
   // List tasks for a bed, with optional filters:

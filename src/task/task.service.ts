@@ -4,17 +4,20 @@ import { CreateTaskDto } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
 import { TaskRecurrence, TaskStatus } from './task.types';
 import { PrismaService } from 'src/prisma/prisma.service';
-import {getPerthDayRange} from 'src/common/utils/date.utils';
+import { getPerthDayRange } from 'src/common/utils/date.utils';
 
 @Injectable()
 export class TaskService {
-
   constructor(
     private readonly bedService: BedService,
     private readonly prisma: PrismaService,
-  ) { }
+  ) {}
 
-  async listForBed(ownerId: string, bedId: number, opts?: { dueOn?: string; status?: TaskStatus }) {
+  async listForBed(
+    ownerId: string,
+    bedId: number,
+    opts?: { dueOn?: string; status?: TaskStatus },
+  ) {
     return this.prisma.task.findMany({
       where: {
         bedId,
@@ -28,7 +31,6 @@ export class TaskService {
   }
 
   async listDueTodayForGarden(ownerId: string, gardenId: number) {
-
     const { startOfDay, endOfDay } = getPerthDayRange();
 
     return this.prisma.task.findMany({
@@ -61,7 +63,6 @@ export class TaskService {
   }
 
   async getGardenWalk(ownerId: string, gardenId: number) {
-
     const { startOfDay, endOfDay } = getPerthDayRange();
 
     return this.prisma.bed.findMany({
@@ -82,17 +83,14 @@ export class TaskService {
               lte: endOfDay,
             },
           },
-          orderBy: [
-            { dueOn: 'asc', },
-            { createdAt: 'asc', },
-          ],
+          orderBy: [{ dueOn: 'asc' }, { createdAt: 'asc' }],
         },
       },
     });
   }
 
   async createForBed(ownerId: string, bedId: number, dto: CreateTaskDto) {
-    this.bedService.findOwnedBedOrThrow(ownerId, bedId);
+    await this.bedService.findOwnedBedOrThrow(ownerId, bedId);
 
     const now = new Date();
 
@@ -110,13 +108,15 @@ export class TaskService {
   }
 
   async update(ownerId: string, taskId: number, dto: UpdateTaskDto) {
-    const task = this.findOwnedTaskOrThrow(ownerId, taskId);
+    await this.findOwnedTaskOrThrow(ownerId, taskId);
 
     return this.prisma.task.update({
       where: { id: taskId },
       data: {
         ...(dto.title !== undefined ? { title: dto.title.trim() } : {}),
-        ...(dto.dueOn !== undefined ? { dueOn: dto.dueOn ? new Date(dto.dueOn) : null } : {}),
+        ...(dto.dueOn !== undefined
+          ? { dueOn: dto.dueOn ? new Date(dto.dueOn) : null }
+          : {}),
         ...(dto.recurrence !== undefined ? { recurrence: dto.recurrence } : {}),
         ...(dto.status !== undefined ? { status: dto.status } : {}),
         updatedAt: new Date(),
@@ -125,7 +125,7 @@ export class TaskService {
   }
 
   async remove(ownerId: string, taskId: number) {
-    this.findOwnedTaskOrThrow(ownerId, taskId);
+    await this.findOwnedTaskOrThrow(ownerId, taskId);
 
     return this.prisma.task.delete({
       where: { id: taskId },
@@ -133,7 +133,7 @@ export class TaskService {
   }
 
   private async findOwnedTaskOrThrow(ownerId: string, taskId: number) {
-    const task = this.prisma.task.findFirst({
+    const task = await this.prisma.task.findFirst({
       where: {
         id: taskId,
         bed: {
@@ -142,12 +142,14 @@ export class TaskService {
           },
         },
       },
-    }); 
+    });
 
     if (!task) {
-      throw new NotFoundException(`Task with id ${taskId} not found for this user`);
+      throw new NotFoundException(
+        `Task with id ${taskId} not found for this user`,
+      );
     }
-    
+
     return task;
   }
 }
