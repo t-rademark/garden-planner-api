@@ -58,6 +58,8 @@ On Windows Command Prompt, use `copy .env.example .env`. In PowerShell, use `Cop
 
 Configure `.env` with values for your local PostgreSQL database and Auth0 tenant. The Auth0 domain must not include a protocol; the issuer must include `https://` and normally ends with `/`.
 
+Integration tests require a separate, disposable PostgreSQL database configured through `TEST_DATABASE_URL`. Apply the Prisma migrations to that database before running the integration suite. Never point `TEST_DATABASE_URL` at a development or production database because the suite clears its data.
+
 The API starts on `http://localhost:3000` by default. Interactive OpenAPI documentation is available at `http://localhost:3000/docs`.
 
 Do not commit `.env`; it is intentionally ignored by Git.
@@ -121,6 +123,7 @@ npm run lint
 npm run build
 npm test
 npm run test:e2e
+npm run test:integration
 ```
 
 `npm run lint` is read-only and fails on warnings. Use `npm run lint:fix` when you intentionally want ESLint and Prettier to update files.
